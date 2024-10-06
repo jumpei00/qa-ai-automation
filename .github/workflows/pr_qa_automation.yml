@@ -13,7 +13,7 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v2
             - name: Get pr summary'
-              id: pr_summary
+              id: pr_info
               uses: actions/github-script@v7
               with: 
                 script: |
@@ -22,8 +22,50 @@ jobs:
                     repo: context.repo.repo,
                     pull_number: context.payload.pull_request.number
                   });
-                  return pr.data.body;
+                  return {
+                    pr_number: pr.data.number,
+                    summary: pr.data.body,
+                  }
             - name: Send data to Dify and get result file
-              id: api_request
+              id: dify_request
               run: |
-                echo "${{steps.pr_summary.outputs.result}}"
+                response=$(curl -X POST 'https://api.dify.ai/v1/chat-messages' \
+                    --header 'Authorization: Bearer ${{ secrets.DIFY_QA_AUTOMATION }}' \
+                    --header 'Content-Type: application/json' \
+                    --data-raw '{
+                        "inputs": {},
+                        "query": "${{fromJson(steps.pr_info.outputs.result).summary}}"
+                        "response_mode": "streaming",
+                        "conversation_id": "",
+                        "user": "${{fromJson(steps.pr_info.outputs.result).pr_number}}",
+                        "files": []
+                    }'
+                )
+                echo "csv_text<<EOF" >> $GITHUB_OUTPUT
+                echo "$response" >> $GITHUB_OUTPUT
+                echo "EOF" >> $GITHUB_OUTPUT
+            - name: Create csv file
+              run: |
+                echo '${{ steps.dify_request.outputs.csv_text }}' > test_case.csv
+            - name: Upload csv file to PR
+              uses: actions/upload-artifact@v4
+              with:
+                name: pr-test-case-upload
+                path: test_case.csv
+            - name: Add QA test case comment to PR
+              uses: actions/github-script@v7
+              with:
+                script: |
+                  const path = 'test_case.csv';
+                  const download_url = 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+                  
+                  let body = '${{fromJson(steps.pr_info.outputs.result).summary}}';
+                  body += '\n\n---\n\n';
+                  body += '[Download the CSV result](${download_url})';
+                  
+                  await github.rest.pulls.update({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.payload.pull_request.number,
+                    body: body
+                  });
