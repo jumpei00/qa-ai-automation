@@ -1,0 +1,29 @@
+name: PR QA Automation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches:
+        - main
+
+jobs:
+    pr_qa_automation:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v2
+            - name: Get pr summary'
+              id: pr_summary
+              uses: actions/github-script@v7
+              with: 
+                script: |
+                  const pr = await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: context.payload.pull_request.number
+                  });
+                  return pr.data.body;
+            - name: Send data to Dify and get result file
+              id: api_request
+              run: |
+                echo "${{steps.pr_summary.outputs.result}}"
