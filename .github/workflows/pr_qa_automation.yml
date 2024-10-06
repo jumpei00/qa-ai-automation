@@ -57,13 +57,14 @@ jobs:
               with:
                 script: |
                   const path = 'test_case.csv';
-                  const download_url = 'https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+                  const download_url = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+                  const prInfo = ${{toJson(steps.pr_info.outputs.result)}};
                   
-                  let body = '${{fromJson(steps.pr_info.outputs.result).summary}}';
+                  let body = prInfo.summary || '';
                   body += '\n\n---\n\n';
                   body += '[Download the CSV result](${download_url})';
                   
-                  github.rest.pulls.update({
+                  await github.rest.pulls.update({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
                     pull_number: context.payload.pull_request.number,
