@@ -36,7 +36,7 @@ jobs:
                     --header 'Content-Type: application/json' \
                     --data-raw '{
                         "inputs": {},
-                        "query": "${{fromJson(steps.pr_info.outputs.result).summary}}"
+                        "query": "${{fromJson(steps.pr_info.outputs.result).summary}}",
                         "response_mode": "streaming",
                         "conversation_id": "",
                         "user": "${{fromJson(steps.pr_info.outputs.result).pr_number}}",
