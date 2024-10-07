@@ -31,20 +31,41 @@ jobs:
             - name: Send data to Dify and get result file
               id: dify_request
               run: |
+                pr_info='${{ steps.pr_info.outputs.result }}'
+                pr_summary=$(echo "$pr_info" | jq -r '.summary')
+                pr_number=$(echo "$pr_info" | jq -r '.pr_number')
+
+                json_data=$(jq -n \
+                    --arg query "$pr_summary" \
+                    --arg user "$pr_number" \
+                    '{
+                        inputs: {},
+                        query: $query,
+                        response_mode: "blocking",
+                        conversation_id: "",
+                        user: $user,
+                        files: []
+                    }')
+
                 response=$(curl -X POST 'https://api.dify.ai/v1/chat-messages' \
                     --header 'Authorization: Bearer ${{ secrets.DIFY_QA_AUTOMATION }}' \
                     --header 'Content-Type: application/json' \
-                    --data-raw '{
-                        "inputs": {},
-                        "query": "${{fromJson(steps.pr_info.outputs.result).summary}}",
-                        "response_mode": "streaming",
-                        "conversation_id": "",
-                        "user": "${{fromJson(steps.pr_info.outputs.result).pr_number}}",
-                        "files": []
-                    }'
+                    --data-raw "$json_data"
                 )
+
+                http_code=$(echo "$response" | tail -n1)
+                response_body=$(echo "$response" | sed '$d')
+
+                if [ "$http_code" -ne 200 ]; then
+                    echo "Error: API request failed with status code $http_code"
+                    echo "Response body: $response_body"
+                    exit 1
+                fi
+                        
+                answer=$(echo "$response_body" | jq -r '.answer // empty')
+
                 echo "csv_text<<EOF" >> $GITHUB_OUTPUT
-                echo "$response" >> $GITHUB_OUTPUT
+                echo "$answer" >> $GITHUB_OUTPUT
                 echo "EOF" >> $GITHUB_OUTPUT
             - name: Create csv file
               run: |
