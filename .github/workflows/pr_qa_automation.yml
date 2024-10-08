@@ -14,26 +14,11 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v2
-            - name: Get pr summary'
-              id: pr_info
-              uses: actions/github-script@v7
-              with: 
-                script: |
-                  const pr = await github.rest.pulls.get({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    pull_number: context.payload.pull_request.number
-                  });
-                  return {
-                    pr_number: pr.data.number,
-                    summary: pr.data.body,
-                  }
             - name: Send data to Dify and get result file
               id: dify_request
               run: |
-                pr_info='${{ steps.pr_info.outputs.result }}'
-                pr_summary=$(echo "$pr_info" | jq -r '.summary')
-                pr_number=$(echo "$pr_info" | jq -r '.pr_number')
+                pr_summary='${{ github.event.pull_request.body }}'
+                pr_number='${{ github.event.pull_request.number }}'
 
                 json_data=$(jq -n \
                     --arg query "$pr_summary" \
@@ -55,13 +40,16 @@ jobs:
 
                 response_body=$(echo "$response" | sed '$d')
                 answer=$(echo "$response_body" | jq -r '.answer // empty')
-
+                
+                echo "$answer"
+                
                 echo "csv_text<<EOF" >> $GITHUB_OUTPUT
                 echo "$answer" >> $GITHUB_OUTPUT
                 echo "EOF" >> $GITHUB_OUTPUT
             - name: Create csv file
               run: |
-                echo '${{ steps.dify_request.outputs.csv_text }}' > test_case.csv
+                echo "${{ steps.dify_request.outputs.csv_text }}"
+                echo "${{ steps.dify_request.outputs.csv_text }}" > test_case.csv
             - name: Upload csv file as artifact
               id: uploader
               uses: actions/upload-artifact@v4
@@ -71,14 +59,12 @@ jobs:
             - name: Update PR description with download link
               uses: actions/github-script@v7
               with:
-                script: |
-                  const prInfo = ${{toJson(steps.pr_info.outputs.result)}};
-                  
-                  let body = prInfo.summary || '';
+                script: |                  
+                  let body = context.payload.pull_request.body;
                   body += '\n\n---\n\n';
                   body += '## QA Test Case\n';
                   body += '[Test Case CSV](${{ steps.uploader.outputs.artifact-url }})';
-                  
+
                   await github.rest.pulls.update({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
