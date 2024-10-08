@@ -62,22 +62,22 @@ jobs:
             - name: Create csv file
               run: |
                 echo '${{ steps.dify_request.outputs.csv_text }}' > test_case.csv
-            - name: Upload csv file to PR
+            - name: Upload csv file as artifact
+              id: uploader
               uses: actions/upload-artifact@v4
               with:
-                name: pr-test-case-upload
+                name: test_case
                 path: test_case.csv
-            - name: Add QA test case comment to PR
+            - name: Update PR description with download link
               uses: actions/github-script@v7
               with:
                 script: |
-                  const path = 'test_case.csv';
-                  const download_url = `https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
                   const prInfo = ${{toJson(steps.pr_info.outputs.result)}};
                   
                   let body = prInfo.summary || '';
                   body += '\n\n---\n\n';
-                  body += '[Download the CSV result](${download_url})';
+                  body += '## QA Test Case\n';
+                  body += '[Test Case CSV](${{ steps.uploader.outputs.artifact-url }})';
                   
                   await github.rest.pulls.update({
                     owner: context.repo.owner,
