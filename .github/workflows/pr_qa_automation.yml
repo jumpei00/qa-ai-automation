@@ -13,7 +13,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
-              uses: actions/checkout@v2
+              uses: actions/checkout@v4
             - name: Send data to Dify and get result file
               id: dify_request
               run: |
@@ -38,9 +38,11 @@ jobs:
                     --data-raw "$json_data"
                 )
 
-                response_body=$(echo "$response" | sed '$d')
-                answer=$(echo "$response_body" | jq -r '.answer // empty')
+                answer=$(echo "$response" | jq -r '.answer')
                 
+                echo "Response"
+                echo "$response"
+                echo "Answer"
                 echo "$answer"
                 
                 echo "csv_text<<EOF" >> $GITHUB_OUTPUT
@@ -48,7 +50,6 @@ jobs:
                 echo "EOF" >> $GITHUB_OUTPUT
             - name: Create csv file
               run: |
-                echo "${{ steps.dify_request.outputs.csv_text }}"
                 echo "${{ steps.dify_request.outputs.csv_text }}" > test_case.csv
             - name: Upload csv file as artifact
               id: uploader
