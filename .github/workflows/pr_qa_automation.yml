@@ -62,8 +62,6 @@ jobs:
               with:
                 script: |                  
                   let body = context.payload.pull_request.body;
-                  body += '\n\n---\n\n';
-                  body += '## QA Test Case\n';
                   body += '[Test Case CSV](${{ steps.uploader.outputs.artifact-url }})';
 
                   await github.rest.pulls.update({
