@@ -11,6 +11,7 @@ jobs:
         permissions:
             pull-requests: write
         runs-on: ubuntu-latest
+        environment: pr_qa_automation
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
