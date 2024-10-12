@@ -8,22 +8,76 @@ on:
 
 jobs:
     pr_qa_automation:
+        permissions:
+            pull-requests: write
         runs-on: ubuntu-latest
+        environment: pr_qa_automation
         steps:
             - name: Checkout code
-              uses: actions/checkout@v2
-            - name: Get pr summary'
-              id: pr_summary
+              uses: actions/checkout@v4
+            - name: Send data to Dify API
+              id: dify_request
+              run: |
+                pr_summary='${{ github.event.pull_request.body }}'
+                pr_number='${{ github.event.pull_request.number }}'
+
+                json_data=$(jq -n \
+                    --arg query "$pr_summary" \
+                    --arg user "$pr_number" \
+                    '{
+                        inputs: {},
+                        query: $query,
+                        response_mode: "blocking",
+                        conversation_id: "",
+                        user: $user,
+                        files: []
+                    }')
+
+                response=$(curl -X POST 'https://api.dify.ai/v1/chat-messages' \
+                    --header 'Authorization: Bearer ${{ secrets.DIFY_QA_AUTOMATION }}' \
+                    --header 'Content-Type: application/json' \
+                    --data-raw "$json_data"
+                )
+
+                answer=$(echo "$response" | jq -r '.answer')
+                
+                echo "Response"
+                echo "$response"
+                echo "Answer"
+                echo "$answer"
+
+                decision_table=$(echo "$answer" | jq -r '.decision_table')
+                test_case=$(echo "$answer" | jq -r '.test_case')
+
+                echo "decision_table<<EOF" >> $GITHUB_OUTPUT
+                echo "$decision_table" >> $GITHUB_OUTPUT
+                echo "EOF" >> $GITHUB_OUTPUT
+
+                echo "test_case<<EOF" >> $GITHUB_OUTPUT
+                echo "$test_case" >> $GITHUB_OUTPUT
+                echo "EOF" >> $GITHUB_OUTPUT
+            - name: Create zip file from csv files
+              run: |
+                echo '${{ steps.dify_request.outputs.decision_table }}' > decision_table.csv
+                echo '${{ steps.dify_request.outputs.test_case }}' > test_case.csv
+                zip -r qa_test_file.zip decision_table.csv test_case.csv
+            - name: Upload zip file
+              id: uploader
+              uses: actions/upload-artifact@v4
+              with:
+                name: qa_test_file
+                path: qa_test_file.zip
+            - name: Update PR description with download link
               uses: actions/github-script@v7
-              with: 
-                script: |
-                  const pr = await github.rest.pulls.get({
+              with:
+                script: |                  
+                  let body = context.payload.pull_request.body;
+                  body += '\n';
+                  body += '[QA Test Files](${{ steps.uploader.outputs.artifact-url }})';
+
+                  await github.rest.pulls.update({
                     owner: context.repo.owner,
                     repo: context.repo.repo,
-                    pull_number: context.payload.pull_request.number
+                    pull_number: context.payload.pull_request.number,
+                    body: body
                   });
-                  return pr.data.body;
-            - name: Send data to Dify and get result file
-              id: api_request
-              run: |
-                echo "${{steps.pr_summary.outputs.result}}"
