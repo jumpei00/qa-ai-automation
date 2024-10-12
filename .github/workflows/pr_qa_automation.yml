@@ -55,7 +55,7 @@ jobs:
                 echo "test_case<<EOF" >> $GITHUB_OUTPUT
                 echo "$test_case" >> $GITHUB_OUTPUT
                 echo "EOF" >> $GITHUB_OUTPUT
-            - name: Create zip file
+            - name: Create zip file from csv files
               run: |
                 echo '${{ steps.dify_request.outputs.decision_table }}' > decision_table.csv
                 echo '${{ steps.dify_request.outputs.test_case }}' > test_case.csv
