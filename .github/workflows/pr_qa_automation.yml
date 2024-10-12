@@ -14,7 +14,7 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-            - name: Send data to Dify and get result file
+            - name: Send data to Dify and get results
               id: dify_request
               run: |
                 pr_summary='${{ github.event.pull_request.body }}'
@@ -44,25 +44,35 @@ jobs:
                 echo "$response"
                 echo "Answer"
                 echo "$answer"
-                
-                echo "csv_text<<EOF" >> $GITHUB_OUTPUT
-                echo "$answer" >> $GITHUB_OUTPUT
+
+                decision_table=$(echo "$answer" | jq -r '.decision_table')
+                test_case=$(echo "$answer" | jq -r '.test_case')
+
+                echo "decision_table<<EOF" >> $GITHUB_OUTPUT
+                echo "$decision_table" >> $GITHUB_OUTPUT
                 echo "EOF" >> $GITHUB_OUTPUT
-            - name: Create csv file
+
+                echo "test_case<<EOF" >> $GITHUB_OUTPUT
+                echo "$test_case" >> $GITHUB_OUTPUT
+                echo "EOF" >> $GITHUB_OUTPUT
+            - name: Create zip file
               run: |
-                echo "${{ steps.dify_request.outputs.csv_text }}" > test_case.csv
-            - name: Upload csv file as artifact
+                echo '${{ steps.dify_request.outputs.decision_table }}' > decision_table.csv
+                echo '${{ steps.dify_request.outputs.test_case }}' > test_case.csv
+                zip -r qa_test_file.zip decision_table.csv test_case.csv
+            - name: Upload zip file as artifact
               id: uploader
               uses: actions/upload-artifact@v4
               with:
-                name: test_case
-                path: test_case.csv
+                name: qa_test_file
+                path: qa_test_file.zip
             - name: Update PR description with download link
               uses: actions/github-script@v7
               with:
                 script: |                  
                   let body = context.payload.pull_request.body;
-                  body += '[Test Case CSV](${{ steps.uploader.outputs.artifact-url }})';
+                  body += '\n';
+                  body += '[QA Test Files](${{ steps.uploader.outputs.artifact-url }})';
 
                   await github.rest.pulls.update({
                     owner: context.repo.owner,
