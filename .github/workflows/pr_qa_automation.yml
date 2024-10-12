@@ -15,7 +15,7 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
-            - name: Send data to Dify
+            - name: Send data to Dify API
               id: dify_request
               run: |
                 pr_summary='${{ github.event.pull_request.body }}'
